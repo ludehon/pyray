@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+  </body>
+  <script>
+    let pixelDensity = 1;
+    let canvas = document.querySelector("#canvas");
+    var ctx = canvas.getContext("2d");
+    canvas.width = 400;
+    canvas.height = 400;
+    const pixels = ctx.getImageData(
+      0,
+      0,
+      canvas.width * pixelDensity,
+      canvas.height * pixelDensity
+    );
+    let WIDTH = 400;
+    let HEIGHT = 400;
+
+    let vector_minus = (v1, v2) => {
+      let x = v1.x - v2.x;
+      let y = v1.y - v2.y;
+      let z = v1.z - v2.z;
+
+      return new Vec3(x, y, z);
+    };
+    let vector_add = (v1, v2) => {
+      let x = v1.x + v2.x;
+      let y = v1.y + v2.y;
+      let z = v1.z + v2.z;
+
+      return new Vec3(x, y, z);
+    };
+    let vector_float_mul = (v, f) => {
+      let x = v.x * f;
+      let y = v.y * f;
+      let z = v.z * f;
+
+      return new Vec3(x, y, z);
+    };
+    let vector_cross = (v1, v2) => {
+      let x = v1.y * v2.z - v1.z * v2.y;
+      let y = v1.z * v2.x - v1.x * v2.z;
+      let z = v1.x * v2.y - v1.y * v2.x;
+
+      return new Vec3(x, y, z);
+    };
+    let vector_norm = v => {
+      return Math.sqrt(Math.pow(v.x, 2) + Math.pow(v.y, 2) + Math.pow(v.z, 2));
+    };
+    //vecteur au carré
+    let vector_dot = (v1, v2) => {
+      return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+    };
+
+    let vector_normalized = v => {
+      let norm = vector_norm(v);
+      let x = v.x / norm;
+      let y = v.y / norm;
+      let z = v.z / norm;
+
+      return new Vec3(x, y, z);
+    };
+
+    let vectors_angle = (vec1, vec2) => {
+      norm1 = vector_norm(vec1);
+
+      norm2 = vector_norm(vec2);
+      dot = vector_dot(vec1, vec2);
+
+      cos = dot / (norm1 * norm2);
+      angle = (Math.acos(cos) * 180) / Math.PI;
+      return angle;
+    };
+
+    class Vec3 {
+      constructor(x = 0, y = 0, z = 0) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+      }
+    }
+    class World {
+      constructor() {
+        this.elements = [];
+        this.lights = [];
+        this.cameras = [];
+      }
+      addElement(elt) {
+        this.elements.push(elt);
+      }
+      addLight(light) {
+        this.lights.push(light);
+      }
+      addCamera(camera) {
+        this.cameras.push(camera);
+      }
+    }
+    class Object3D {
+      constructor(position = new Vec3(), speed = new Vec3()) {
+        this.position = position;
+        this.speed = speed;
+      }
+    }
+    class Element extends Object3D {
+      constructor(position, speed, type = "") {
+        super(position, speed);
+        this.type = type;
+      }
+    }
+
+    class Camera extends Object3D {
+      constructor({ position, speed, at, up, fov, aspect }) {
+        super(position, speed);
+        this.at = at;
+        this.up = up;
+        this.fov = fov;
+        this.aspect = aspect;
+
+        this.zdir = vector_normalized(vector_minus(this.at, this.position));
+        this.xdir = vector_normalized(vector_cross(this.up, this.zdir));
+        this.ydir = vector_normalized(vector_cross(this.zdir, this.xdir));
+        this.center = vector_float_mul(
+          this.zdir,
+          1 / Math.tan(((this.fov * Math.PI) / 180) * 0.5)
+        );
+      }
+    }
+
+    class Light extends Object3D {
+      constructor({
+        position,
+        speed,
+        color = new Vec3(255, 255, 255),
+        intensity = 0.9
+      }) {
+        super(position, speed);
+        this.intensity = intensity;
+        this.color = color;
+      }
+    }
+    class Sphere extends Element {
+      constructor({ position, radius, speed, color = new Vec3() }) {
+        super(position, speed, "sphere");
+        this.color = color;
+        this.radius = radius;
+      }
+    }
+    class Plane extends Element {
+      constructor(position, speed, color = new Vec3(), normal = new Vec3()) {
+        super(position, speed, "plane");
+        this.color = color;
+        this.normal = normal;
+      }
+    }
+
+    let calculateNormals = (sphere, point) => {
+      let vecteurNormal = vector_normalized(
+        vector_minus(point, sphere.position)
+      );
+      return vecteurNormal;
+    };
+
+    let ray_at = (ray, O, t) => {
+      return vector_add(vector_float_mul(ray, t), O);
+    };
+
+    let d = (wcamera, i, j) => {
+      let xr = wcamera.xdir;
+      let yr = vector_float_mul(wcamera.ydir, 1 / wcamera.aspect);
+      let zr = vector_float_mul(
+        wcamera.zdir,
+        1 / Math.tan(0.5 * (wcamera.fov * (Math.PI / 180)))
+      );
+      let vec = vector_normalized(
+        vector_add(
+          zr,
+          vector_add(
+            vector_float_mul(xr, (i + 0.5 - WIDTH / 2) / (WIDTH / 2)),
+            vector_float_mul(yr, (j + 0.5 - HEIGHT / 2) / (HEIGHT / 2))
+          )
+        )
+      );
+      // console.log("i", i);
+      // console.log("vec", vec);
+      return vec;
+    };
+
+    let process_sphere = (wcamera, ray, sphere) => {
+      let O = wcamera.center;
+
+      // console.log("ray", ray);
+      a = vector_dot(ray, ray);
+
+      let co = vector_minus(O, sphere.position);
+      b = 2 * vector_dot(ray, co);
+
+      c = vector_dot(co, co) - sphere.radius * sphere.radius;
+
+      det = b * b - 4 * a * c;
+
+      // console.log("det", det);
+
+      if (det < 0) {
+        return -1;
+      }
+
+      t1 = (-b + Math.sqrt(det)) / (2 * a);
+      t2 = (-b - Math.sqrt(det)) / (2 * a);
+      // console.log("t1", t1);
+      // console.log("t2", t2);
+
+      let nearest;
+      if (t1 <= t2) {
+        nearest = t1;
+      } else {
+        nearest = t2;
+      }
+      return nearest;
+    };
+
+    let render = world => {
+      let wcamera = world.cameras[0];
+
+      let picture = [];
+      for (let y = 0; y < 400; y++) {
+        // 0-400
+        for (let x = 00; x <= 400; x++) {
+          // let x = 100;
+          // let y = 50;
+          let ray = d(wcamera, x, y);
+
+          let color = new Vec3();
+          let intensity = 0;
+          for (let i = 0; i < world.elements.length; i++) {
+            if ((world.elements[i].type = "sphere")) {
+              let t = process_sphere(wcamera, ray, world.elements[i]);
+              // console.log(t)
+              if (t != -1) {
+                color = world.elements[i].color;
+              }
+              for (let j = 0; j < world.lights.length; j++) {
+                let pos = ray_at(ray, wcamera.center, t);
+                let norm = calculateNormals(world.elements[i], pos);
+                // console.log("norm", norm);
+                let vec_lum = vector_minus(world.lights[j].position, pos);
+
+                angle = vectors_angle(norm, vec_lum);
+                // console.log("angle", angle);
+
+                if (angle < 90 && angle > -90) {
+                  lux = (90 - angle) / 90;
+                } else {
+                  lux = 0;
+                }
+                intensity += lux * world.lights[j].intensity;
+              }
+            }
+          }
+          if (intensity > 1) {
+            intensity = 1;
+          }
+          // console.log("intensity", intensity)
+
+          let indexPic = y * 400 * 3 + x * 3;
+          picture[indexPic] = color.x * intensity;
+          picture[indexPic + 1] = color.y * intensity;
+          picture[indexPic + 2] = color.z * intensity;
+        }
+      }
+      return picture;
+    };
+    let display = picture => {
+      for (let y = 0; y < pixels.height; y++) {
+        for (let x = 0; x < pixels.width; x++) {
+          let index = y * pixels.width * 4 + x * 4;
+          let indexPic = y * 400 * 3 + x * 3;
+
+          pixels.data[index] = picture[indexPic];
+          pixels.data[index + 1] = picture[indexPic + 1];
+          pixels.data[index + 2] = picture[indexPic + 2];
+          pixels.data[index + 3] = 255;
+          ctx.putImageData(pixels, 0, 0);
+        }
+      }
+    };
+    //}
+    let camera = new Camera({
+      position: new Vec3(2, 1, 3),
+      // at: new Vec3(0, 0.3, 0),
+      at: new Vec3(0, 0, 1),
+      up: new Vec3(0, 1, 0),
+      fov: 60,
+      aspect: 400 / 400
+    });
+
+    let world = new World();
+
+    let sphereB = new Sphere({
+      position: new Vec3(0, 0.5, 0),
+      radius: 0.3,
+      color: new Vec3(0, 0, 255)
+    });
+
+    let sphereR = new Sphere({
+      position: new Vec3(0, 0, 1),
+      radius: 0.3,
+      color: new Vec3(255, 0, 0)
+    });
+
+    let sphereG = new Sphere({
+      position: new Vec3(1, 0, 1),
+      radius: 0.3,
+      color: new Vec3(0, 255, 0)
+    });
+
+    let light = new Light({ position: new Vec3(3, 2, 5) });
+
+    let light2 = new Light({ position: new Vec3(-2, 1, 1) });
+
+    world.addCamera(camera);
+    world.addElement(sphereB);
+    world.addElement(sphereR);
+    world.addElement(sphereG)
+
+    world.addLight(light);
+    // world.addLight(light2);
+
+    display(render(world));
+  </script>
+</html>
