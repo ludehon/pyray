@@ -52,3 +52,11 @@ class Vec3():
         cos = dot / (norm1 * norm2)
         angle = (acos(cos) * 180) / pi
         return angle
+    
+    def ray_at(self, O, t):
+        """
+        Return position from the vector self and distance "t" and origin "O"
+        """
+        point = self.float_mul(t).plus(O)
+        return point
+    
