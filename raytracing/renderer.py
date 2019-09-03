@@ -1,65 +1,49 @@
+import numpy as np
+from vec3 import Vec3
 
 
 class Renderer():
-    def __init__(self, world, resolution=(200, 200)):
+    def __init__(self, world):
         self.world = world
-        self.resolution = resolution
         
-    def render(self, camera):
+    def render(self, camera_num):
         """
-        :param camera: camera numero
-        :type camera: int
+        :param camera_num: camera numero
+        :type camera_num: int
         """
-        # TODO
-        """
-        let wcamera = world.cameras[0];
-
-        let picture = [];
-        for (let y = 0; y < 400; y++) {
-            // 0-400
-            for (let x = 00; x <= 400; x++) {
-            // let x = 100;
-            // let y = 50;
-            let ray = d(wcamera, x, y);
-
-            let color = new Vec3();
-            let intensity = 0;
-            for (let i = 0; i < world.elements.length; i++) {
-                if ((world.elements[i].type = "sphere")) {
-                let t = process_sphere(wcamera, ray, world.elements[i]);
-                // console.log(t)
-                if (t != -1) {
-                    color = world.elements[i].color;
-                }
-                for (let j = 0; j < world.lights.length; j++) {
-                    let pos = ray_at(ray, wcamera.center, t);
-                    let norm = calculateNormals(world.elements[i], pos);
-                    // console.log("norm", norm);
-                    let vec_lum = vector_minus(world.lights[j].position, pos);
-
-                    angle = vectors_angle(norm, vec_lum);
-                    // console.log("angle", angle);
-
-                    if (angle < 90 && angle > -90) {
-                    lux = (90 - angle) / 90;
-                    } else {
-                    lux = 0;
-                    }
-                    intensity += lux * world.lights[j].intensity;
-                }
-                }
-            }
-            if (intensity > 1) {
-                intensity = 1;
-            }
-            // console.log("intensity", intensity)
-
-            let indexPic = y * 400 * 3 + x * 3;
-            picture[indexPic] = color.x * intensity;
-            picture[indexPic + 1] = color.y * intensity;
-            picture[indexPic + 2] = color.z * intensity;
-            }
-        }
-        return picture;
-        """
-        pass
+        wcamera = self.world.cameras[camera_num]
+        picture = np.zeros((wcamera.HEIGHT, wcamera.WIDTH, 3))
+        
+        for x in range(wcamera.WIDTH):
+            for y in range(wcamera.HEIGHT):
+                ray = wcamera.d(x, y)
+                color = Vec3()
+                intensity = 0
+                
+                for e in self.world.elements:
+                    if (e.type == "sphere"):
+                        t = e.process(wcamera, ray)
+                        
+                        if (t != -1):
+                            color = e.color
+                        
+                        for l in self.world.lights:
+                            pos = ray.ray_at(wcamera.center, t)
+                            normal = e.get_normal(pos)
+                            vec_lum = l.position.minus(pos)
+                            angle = normal.get_angle(vec_lum)
+                            if (angle < 90 and angle > -90):
+                                lux = (90 - angle) / 90
+                            else:
+                                lux = 0
+                            
+                            intensity = intensity + (lux * l.intensity)  
+                            
+                if (intensity > 1):
+                    intensity = 1
+                
+                picture[x][y][0] = color.x * intensity
+                picture[x][y][1] = color.y * intensity
+                picture[x][y][2] = color.z * intensity
+                
+        return picture

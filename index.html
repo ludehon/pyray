@@ -55,7 +55,7 @@
     let vector_norm = v => {
       return Math.sqrt(Math.pow(v.x, 2) + Math.pow(v.y, 2) + Math.pow(v.z, 2));
     };
-    //vecteur au carré
+    // squared vector
     let vector_dot = (v1, v2) => {
       return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
     };
@@ -87,6 +87,7 @@
         this.z = z;
       }
     }
+
     class World {
       constructor() {
         this.elements = [];
@@ -236,9 +237,9 @@
           // let x = 100;
           // let y = 50;
           let ray = d(wcamera, x, y);
-
           let color = new Vec3();
           let intensity = 0;
+
           for (let i = 0; i < world.elements.length; i++) {
             if ((world.elements[i].type = "sphere")) {
               let t = process_sphere(wcamera, ray, world.elements[i]);
